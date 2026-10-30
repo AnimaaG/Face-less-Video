@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HTML Video Studio — Canvas Recorder</title>
+<style>
+:root{color-scheme:dark;--bg:#10141c;--panel:#171e29;--line:#354154;--text:#edf2fa;--muted:#aab5c5;--blue:#2468bd}
+*{box-sizing:border-box}body{margin:0;height:100vh;overflow:hidden;background:var(--bg);color:var(--text);font:14px system-ui,Arial}
+header{height:56px;padding:0 18px;display:flex;align-items:center;justify-content:space-between;background:var(--panel);border-bottom:1px solid var(--line)}
+main{height:calc(100vh - 56px);display:grid;grid-template-columns:minmax(280px,1fr) 8px minmax(300px,1.15fr)}
+.pane{padding:14px;min-width:0;min-height:0;display:flex;flex-direction:column;gap:10px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px}.muted,.foot{color:var(--muted);font-size:12px}
+textarea{flex:1;min-height:0;resize:none;width:100%;padding:14px;border:1px solid var(--line);border-radius:8px;background:#0b1018;color:#dce9fb;font:12px/1.55 Consolas,monospace;outline:none}
+.preview{flex:1;min-height:0;background:#fff;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+iframe{width:100%;height:100%;border:0;background:white}
+.divider{background:#30394a;cursor:col-resize}.divider:hover{background:#65a8ff}
+button,input,select{padding:9px 12px;border-radius:7px;border:1px solid #3a4659;background:#252f3e;color:#fff;font:inherit}
+button{cursor:pointer}button.primary{background:var(--blue);border-color:#347bd1}button:disabled{opacity:.45;cursor:not-allowed}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}#status{min-height:18px;color:#b9d4ff;font-size:12px}
+.duration{width:90px}.fullscreen-preview{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;z-index:10000!important;border:0!important;border-radius:0!important;background:#000!important}
+body.recording header,body.recording #left,body.recording #divider,body.recording .rightbar,body.recording .righttools,body.recording #status,body.recording .foot{display:none!important}
+body.recording main{display:block!important;width:100vw!important;height:100vh!important}
+body.recording main>.pane{display:block!important;width:100vw!important;height:100vh!important;padding:0!important}
+body.recording .preview{position:fixed;inset:0;width:100vw;height:100vh;border:0;border-radius:0;background:#000}
+body.recording #frame{
+ position:absolute!important;width:1920px!important;height:1080px!important;
+ left:50%!important;top:50%!important;
+ transform:translate(-50%,-50%) scale(var(--record-scale,1))!important;
+ transform-origin:center!important;border:0!important;
+}
+@media(max-width:800px){body{height:auto;overflow:auto}main{height:auto;display:flex;flex-direction:column}.pane{min-height:48vh}.divider{display:none}}
+</style>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+</head>
+<body>
+<header><strong>HTML Video Studio</strong><span class="muted">HTML → preview → canvas recording (no screen-share dialog)</span></header>
+<main id="layout">
+<section class="pane" id="left">
+ <div class="bar"><strong>1. AI video prompt / HTML input</strong><span class="muted">Copy prompt, then paste generated HTML here</span></div>
+ <textarea id="code" spellcheck="false">You are an expert educational video scriptwriter, motion-graphics designer, and front-end HTML/CSS/JavaScript animation developer.
+
+TASK
+Create a polished, professional, faceless animated video as ONE complete HTML file that can be pasted into my HTML Video Studio and recorded as a WebM video.
+
+FIRST: UNDERSTAND MY MATERIAL
+I may provide any combination of:
+- A topic, rough idea, question, outline, lesson, narration, or written notes
+- PDF documents, Word documents, PowerPoint slides, spreadsheets, text files
+- Images, screenshots, diagrams, charts, scanned pages, or photographs
+- Existing scripts, reference links, or other attachments
+
+Carefully inspect every supplied attachment that you can access. Extract relevant facts, text, numbers, examples, labels, diagrams, and sequence from the material. Use the supplied material as the primary source. Do not invent facts or silently change its meaning. If a file or image is unreadable or unavailable, tell me exactly what you could not inspect. If essential information is missing, ask concise clarification questions before creating the video. If the request is already clear, proceed without unnecessary questions.
+
+MY VIDEO REQUEST
+[Describe the topic, audience, purpose, language, desired style, and any specific requirements here. If I leave something blank, infer a sensible choice from my material and state your assumptions.]
+
+Video duration in seconds !   window.VIDEO_DURATION_SECONDS = 120;
+Language : 
+add proper diagrams , proper explainations , 3d animations , 2d animations , online cartoon assets 
+need attractive , imformative , professionaly edited video , add attractive, different different backgrounds, 
+according to video add assets , such as teacher cartoons , or rela life cartoon moment , add unique animations between two points.
+refer not your type youtube chanel, need this level visuals ! or use stickman animations in video.
+
+
+VIDEO DESIGN REQUIREMENTS
+- Detect the most suitable teaching/storytelling approach from the topic and material: explainer, step-by-step tutorial, worked example, documentary-style narration, comparison, timeline, process demonstration, case study, data/story visualization, or another suitable format.
+- Create a clear beginning, logical middle, and strong ending.
+- Use professional visual design, readable typography, consistent colors, smooth transitions, and purposeful motion.
+- Use animated diagrams, labels, charts, equations, timelines, icons, shapes, character/stick-figure illustrations, or other visuals when they improve understanding.
+- Avoid a static slide-deck appearance. Keep meaningful visual movement throughout, but do not make motion distracting.
+- Include narration or on-screen explanatory text as appropriate. If audio generation is not available in plain HTML, make the video understandable with on-screen text and visual storytelling.
+- Keep all important text inside safe margins and readable at 16:9.
+- Use suitable free online assets only when they genuinely improve the video. Prefer assets with clear reuse permissions. Do not depend on paid APIs, paid stock assets, or assets requiring login. Provide sensible CSS/SVG fallbacks if an online asset fails.
+- Do not use copyrighted characters, logos, music, or footage without permission.
+
+DURATION AND TIMING
+- Target video duration: [Enter desired duration, e.g. 2 minutes, 8 minutes, 15 minutes. If not specified, choose a suitable duration and tell me.]
+- The HTML must control its own recording duration. Include this exact kind of declaration near the start of its JavaScript, using the actual planned duration in seconds:
+- Replace 120 with the correct number of seconds for the requested duration.
+- Make the animation timeline begin at 0 and progress in sync with the declared duration. Do not make the timeline depend on when the preview happens to be opened.
+- At the end of the timeline, send this message so the recorder can stop cleanly:
+  parent.postMessage({studio:'video-complete'}, '*');
+- Do not send the completion message before the final scene has finished.
+
+TECHNICAL HTML REQUIREMENTS
+- Return ONE complete, ready-to-run HTML document, including <!doctype html>, <html>, <head>, styles, and scripts.
+- Use HTML, CSS, SVG, and vanilla JavaScript. Do not require React, npm, a build step, a server, or installation.
+- Make it work when pasted into a browser-based HTML preview and recorded at 1920×1080, 16:9.
+- Start the video from the opening scene whenever the HTML page is freshly loaded.
+- Use requestAnimationFrame or a reliable time-based animation loop; calculate scene progress from elapsed time so the animation stays synchronized.
+- Avoid zero-sized canvas elements. If using canvas, always set a positive width and height before drawing.
+- Avoid overlapping animation loops, unhandled errors, and cross-origin canvas dependencies.
+- Keep external dependencies to a minimum. If using online fonts or assets, provide fallbacks.
+- Ensure all scenes remain visible and legible at the recording size.
+- Do not include editor/studio interface elements in the video itself.
+
+OUTPUT FORMAT
+1. Briefly summarize your interpretation of my request and the material you used.
+2. State the planned duration and scene structure.
+3. Then provide the complete HTML code in ONE code block, with no omitted sections, placeholders, or "continue" instructions.
+4. Make sure the duration declaration and video-complete message are present in the code.
+5. If you cannot inspect any attachment, clearly identify it instead of pretending it was reviewed.
+
+Now review my request and all attached materials, then create the video HTML.
+share code in plain text in chat 
+</textarea>
+<div class="tools">
+  <button class="primary" id="copyPrompt">Copy AI prompt</button>
+  <button id="run">Run / Update preview</button>
+  <button id="sample">Load Sample</button>
+  <button id="clear">Clear</button>
+</div>
+ <div class="foot">Workflow: copy the prompt and send it to an AI with your topic and attachments. Replace this prompt with the complete HTML returned by the AI, then click Run / Update preview. Use trusted HTML only.</div>
+</section>
+<div class="divider" id="divider"></div>
+<section class="pane" id="right">
+ <div class="bar rightbar"><strong>2. Video preview</strong><span class="muted">Rendered in the browser</span></div>
+ <div class="preview" id="previewWrap"><iframe id="frame" sandbox="allow-scripts allow-same-origin" title="HTML preview"></iframe></div>
+<div class="tools righttools">
+
+  <label class="muted">
+    FPS
+    <select id="fps">
+      <option>24</option>
+      <option selected>30</option>
+      <option>60</option>
+    </select>
+  </label>
+
+  <label class="muted">
+    Download format
+    <select id="format">
+      <option value="mp4" selected>MP4 (H.264)</option>
+      <option value="webm">WebM (VP9)</option>
+    </select>
+  </label>
+
+  <button class="primary" id="record">
+    ● Record full preview
+  </button>
+
+  <button id="download" disabled>
+    Download Video
+  </button>
+
+</div>
+ <div id="status">Set the duration, then record. Recording ends automatically after that duration.</div>
+ <div class="foot">No screen sharing is used. The preview is captured inside its own frame. Use only HTML code you trust; longer videos need more memory and time.</div>
+</section></main>
+<script>
+(()=> {
+const $=id=>document.getElementById(id), code=$('code'), frame=$('frame'), status=$('status');
+let recorder=null, chunks=[], blob=null, blobUrl=null, timer=null, captureCanvas=null, captureCtx=null, tick=null, recording=false;
+function say(s,err=false){status.textContent=s;status.style.color=err?'#ffaaaa':'#b9d4ff'}
+function buildSrcdoc(source){
+ // The child page captures its own DOM into a canvas. The sandbox keeps pasted scripts isolated from the parent.
+ const bridge=`<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
+<script>
+(()=>{let rec=null,parts=[],canvas=null,ctx=null,loop=null,stopTimer=null,active=false,drawing=false,stream=null;
+const send=(type,extra={})=>parent.postMessage({studio:type,...extra},'*');
+async function start(fps){
+ try{
+  if(!window.html2canvas)throw Error('Could not load html2canvas. Check your internet connection.');
+  active=true;
+  canvas=document.createElement('canvas');canvas.width=1920;canvas.height=1080;ctx=canvas.getContext('2d');
+  stream=canvas.captureStream(fps);
+  rec=new MediaRecorder(stream,{mimeType:MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm',videoBitsPerSecond:16000000});
+  parts=[];rec.ondataavailable=e=>{if(e.data&&e.data.size)parts.push(e.data)};
+  rec.onstop=()=>{active=false;clearInterval(loop);clearTimeout(stopTimer);stream.getTracks().forEach(t=>t.stop());const b=new Blob(parts,{type:rec.mimeType||'video/webm'});b.arrayBuffer().then(buffer=>send('complete',{buffer,mime:b.type}));};
+  await draw();if(!active)return;
+  rec.start(1000);loop=setInterval(()=>{if(active&&!drawing)draw()},Math.max(50,1000/fps));
+  const declared=Number(window.VIDEO_DURATION_SECONDS||document.documentElement.dataset.videoDuration||document.body.dataset.videoDuration||0);
+  if(declared>0){stopTimer=setTimeout(finish,declared*1000);send('started',{duration:declared});}
+  else send('started',{duration:0});
+ }catch(e){active=false;send('error',{message:e.message})}
+}
+function finish(){active=false;clearInterval(loop);clearTimeout(stopTimer);if(rec&&rec.state!=='inactive')rec.stop();}
+addEventListener('message',e=>{
+ if(e.data&&e.data.studio==='start')start(e.data.fps);
+ if(e.data&&e.data.studio==='finish')finish();
+ if(e.data&&e.data.studio==='video-complete')finish();
+});
+async function draw(){
+ if(!active||drawing)return;drawing=true;
+ try{
+  const w=1920,h=1080;
+  const shot=await html2canvas(document.documentElement,{backgroundColor:null,scale:1,width:w,height:h,windowWidth:w,windowHeight:h,logging:false,
+   onclone:doc=>doc.querySelectorAll('canvas').forEach(c=>{const r=c.getBoundingClientRect();if(!c.width||!c.height||!r.width||!r.height)c.remove()})});
+  if(active&&shot.width>0&&shot.height>0){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#000';ctx.fillRect(0,0,canvas.width,canvas.height);const k=Math.min(canvas.width/shot.width,canvas.height/shot.height),dw=shot.width*k,dh=shot.height*k;ctx.drawImage(shot,(canvas.width-dw)/2,(canvas.height-dh)/2,dw,dh);}
+ }catch(e){if(active)send('error',{message:'Frame capture failed: '+e.message})}
+ finally{drawing=false}
+}
+})();<\/script>`;
+ let clean=source;
+ if(/<\/body\s*>/i.test(clean))return clean.replace(/<\/body\s*>/i,bridge+'</body>');
+ return clean+bridge;
+}
+function update(){frame.srcdoc=buildSrcdoc(code.value);say('Preview updated.')}
+$('copyPrompt').onclick=async()=>{
+ try{await navigator.clipboard.writeText(code.value);say('AI video prompt copied. Paste it into your AI chat and attach your source files.')}
+ catch(e){code.focus();code.select();say('Clipboard access blocked. Press Ctrl+C to copy the selected prompt.',true)}
+};
+$('run').onclick=update;
+$('sample').onclick=()=>{code.value='<!doctype html><html><head><style>body{margin:0;height:100vh;display:grid;place-items:center;background:linear-gradient(120deg,#172554,#7e22ce);color:white;font: bold 5vw Arial}h1{animation:pulse 2s infinite}@keyframes pulse{50%{transform:scale(1.12);color:#fde68a}}</style></head><body><h1>My animated scene</h1></body></html>';update()};
+$('clear').onclick=()=>{code.value='';update()};
+function reset(){recording=false;document.body.classList.remove('recording');document.body.style.removeProperty('--record-scale');frame.style.width='';frame.style.height='';frame.style.transform='';$('record').disabled=false;$('download').disabled=!blob;$('record').textContent='● Record full preview';}
+$('record').onclick=()=>{
+ const fps=Number($('fps').value)||24;
+ chunks=[];blob=null;$('download').disabled=true;recording=true;$('record').disabled=true;$('record').textContent='Recording…';
+ say('Restarting video from the beginning…');
+ // Recreate the preview iframe from the current editor HTML. This resets CSS animations,
+ // video elements and JavaScript timelines before the recorder starts.
+ document.body.style.setProperty('--record-scale',String(Math.min(innerWidth/1920,innerHeight/1080)));
+ document.body.classList.add('recording');
+ frame.onload=()=>{
+  frame.onload=null;
+  setTimeout(()=>frame.contentWindow.postMessage({studio:'start',fps},'*'),700);
+ };
+ frame.srcdoc=buildSrcdoc(code.value);
+};
+window.addEventListener('message',e=>{
+ const d=e.data||{};
+ if(d.studio==='started'){
+ if(d.duration>0)say('Recording from the beginning. HTML duration: '+d.duration+' seconds.');
+ else say('Recording from the beginning. Waiting for the HTML completion signal.');
+}
+ if(d.studio==='error'){say(d.message||'Recording failed.',true);reset();}
+ if(d.studio==='complete'){
+  blob=new Blob([d.buffer],{type:d.mime||'video/webm'});
+  if(blobUrl)URL.revokeObjectURL(blobUrl);blobUrl=URL.createObjectURL(blob);
+  reset();
+  say('Recording complete. Select MP4 or WebM and click Download Video.');
+ }
+});
+let ffmpeg = null;
+let ffmpegLoading = false;
+
+async function convertToMP4(webmBlob) {
+
+  if (!window.FFmpeg) {
+    throw new Error("FFmpeg library could not load. Check your internet connection.");
+  }
+
+  const { createFFmpeg, fetchFile } = FFmpeg;
+
+  if (!ffmpeg) {
+    if (ffmpegLoading) {
+      throw new Error("FFmpeg is already loading. Please try again.");
+    }
+
+    ffmpegLoading = true;
+
+    try {
+      ffmpeg = createFFmpeg({
+        log: false,
+        corePath:
+          "https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js"
+      });
+
+      await ffmpeg.load();
+
+    } finally {
+      ffmpegLoading = false;
+    }
+  }
+
+  say("Converting video to MP4. Please wait...");
+
+  ffmpeg.FS(
+    "writeFile",
+    "input.webm",
+    await fetchFile(webmBlob)
+  );
+
+  await ffmpeg.run(
+    "-i", "input.webm",
+    "-c:v", "libx264",
+    "-preset", "ultrafast",
+    "-pix_fmt", "yuv420p",
+    "-movflags", "+faststart",
+    "-an",
+    "output.mp4"
+  );
+
+  const output = ffmpeg.FS(
+    "readFile",
+    "output.mp4"
+  );
+
+  const mp4Blob = new Blob(
+    [output.buffer],
+    { type: "video/mp4" }
+  );
+
+  try {
+    ffmpeg.FS("unlink", "input.webm");
+    ffmpeg.FS("unlink", "output.mp4");
+  } catch (e) {}
+
+  return mp4Blob;
+}
+
+$('download').onclick = async () => {
+
+  if (!blob) return;
+
+  const format = $('format').value;
+  $('download').disabled = true;
+
+  try {
+
+    let finalBlob;
+    let filename;
+
+    if (format === "mp4") {
+
+      finalBlob = await convertToMP4(blob);
+      filename = "MPSC-Educational-Video.mp4";
+
+    } else {
+
+      finalBlob = blob;
+      filename = "MPSC-Educational-Video.webm";
+
+    }
+
+    const url = URL.createObjectURL(finalBlob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+    say("Video downloaded successfully: " + filename);
+
+  } catch (error) {
+
+    say("Conversion failed: " + error.message, true);
+
+  } finally {
+
+    $('download').disabled = false;
+
+  }
+
+};
+const divider=$('divider'),layout=$('layout');let drag=false;
+divider.onpointerdown=e=>{drag=true;divider.setPointerCapture(e.pointerId)};
+divider.onpointermove=e=>{if(!drag||innerWidth<=800)return;const r=layout.getBoundingClientRect(),p=Math.max(25,Math.min(75,(e.clientX-r.left)/r.width*100));layout.style.gridTemplateColumns=`minmax(260px,${p}fr) 8px minmax(280px,${100-p}fr)`};
+divider.onpointerup=divider.onpointercancel=()=>drag=false;
+update();
+})();
+</script></body></html>
