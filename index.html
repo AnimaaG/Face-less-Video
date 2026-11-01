@@ -1,867 +1,724 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>HTML Video Studio — Canvas Recorder</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Video Studio</title>
+    <style>
+        :root {
+            --bg-main: #12141a;
+            --bg-panel: #1b1e26;
+            --bg-editor: #0f1115;
+            --border: #2a2e3a;
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --success: #10b981;
+            --text-main: #f3f4f6;
+            --text-sub: #9ca3af;
+        }
 
-<style>
-:root{
- color-scheme:dark;
- --bg:#10141c;
- --panel:#171e29;
- --line:#354154;
- --text:#edf2fa;
- --muted:#aab5c5;
- --blue:#2468bd;
-}
-*{box-sizing:border-box}
-body{
- margin:0;height:100vh;overflow:hidden;
- background:var(--bg);color:var(--text);
- font:14px system-ui,Arial
-}
-header{
- height:56px;padding:0 18px;
- display:flex;align-items:center;justify-content:space-between;
- background:var(--panel);border-bottom:1px solid var(--line)
-}
-main{
- height:calc(100vh - 56px);
- display:grid;
- grid-template-columns:minmax(280px,1fr) 8px minmax(300px,1.15fr)
-}
-.pane{
- padding:14px;min-width:0;min-height:0;
- display:flex;flex-direction:column;gap:10px
-}
-.bar{
- display:flex;align-items:center;
- justify-content:space-between;gap:8px
-}
-.muted,.foot{color:var(--muted);font-size:12px}
-textarea{
- flex:1;min-height:0;resize:none;width:100%;
- padding:14px;border:1px solid var(--line);
- border-radius:8px;background:#0b1018;color:#dce9fb;
- font:12px/1.55 Consolas,monospace;outline:none
-}
-.preview{
- flex:1;min-height:0;background:#fff;
- border:1px solid var(--line);border-radius:8px;overflow:hidden
-}
-iframe{width:100%;height:100%;border:0;background:white}
-.divider{background:#30394a;cursor:col-resize}
-.divider:hover{background:#65a8ff}
-button,input,select{
- padding:9px 12px;border-radius:7px;
- border:1px solid #3a4659;background:#252f3e;
- color:#fff;font:inherit
-}
-button{cursor:pointer}
-button.primary{background:var(--blue);border-color:#347bd1}
-button:disabled{opacity:.45;cursor:not-allowed}
-.tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-#status{min-height:18px;color:#b9d4ff;font-size:12px}
-.duration{width:90px}
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
 
-body.recording header,
-body.recording #left,
-body.recording #divider,
-body.recording .rightbar,
-body.recording .righttools,
-body.recording #status,
-body.recording .foot{display:none!important}
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-body.recording main{
- display:block!important;width:100vw!important;height:100vh!important
-}
-body.recording main>.pane{
- display:block!important;width:100vw!important;height:100vh!important;
- padding:0!important
-}
-body.recording .preview{
- position:fixed;inset:0;width:100vw;height:100vh;
- border:0;border-radius:0;background:#000
-}
-body.recording #frame{
- position:absolute!important;
- width:1920px!important;height:1080px!important;
- left:50%!important;top:50%!important;
- transform:translate(-50%,-50%) scale(var(--record-scale,1))!important;
- transform-origin:center!important;border:0!important
-}
+        /* Top Bar */
+        header {
+            height: 60px;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            z-index: 10;
+        }
 
-@media(max-width:800px){
- body{height:auto;overflow:auto}
- main{height:auto;display:flex;flex-direction:column}
- .pane{min-height:48vh}
- .divider{display:none}
-}
-</style>
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+            letter-spacing: 0.5px;
+        }
 
-<!-- FFmpeg.wasm 0.11.6 -->
-<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+        .brand-dot {
+            width: 12px;
+            height: 12px;
+            background-color: var(--primary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Buttons & Toggles */
+        button {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary { background-color: var(--primary); color: #fff; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+
+        .btn-danger { background-color: var(--danger); color: #fff; }
+        .btn-danger:hover { background-color: var(--danger-hover); }
+
+        .btn-outline {
+            background-color: transparent;
+            border-color: var(--border);
+            color: var(--text-main);
+        }
+        .btn-outline:hover { background-color: rgba(255, 255, 255, 0.05); }
+
+        .audio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .recording-timer {
+            font-family: monospace;
+            font-size: 1rem;
+            color: var(--danger);
+            display: none;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+        }
+
+        .pulse-indicator {
+            width: 8px;
+            height: 8px;
+            background-color: var(--danger);
+            border-radius: 50%;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.3; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1.2); }
+        }
+
+        /* Workspace Grid */
+        .workspace {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            overflow: hidden;
+        }
+
+        /* Editor Section */
+        .editor-container {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border);
+            background: var(--bg-editor);
+        }
+
+        .section-header {
+            height: 40px;
+            padding: 0 1rem;
+            background-color: var(--bg-panel);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            color: #d1d5db;
+            border: none;
+            outline: none;
+            resize: none;
+            padding: 1rem;
+            font-family: "Fira Code", monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            tab-size: 2;
+        }
+
+        /* Preview Stage */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            background-color: #0b0c0e;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            position: relative;
+        }
+
+        .stage-wrapper {
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 16 / 9;
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        /* Fullscreen styles for Stage Wrapper */
+        .stage-wrapper:fullscreen {
+            max-width: 100vw;
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* 5-Second Hold Countdown Overlay */
+        .countdown-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            color: #fff;
+            text-align: center;
+        }
+
+        .countdown-number {
+            font-size: 6rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 1rem;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .countdown-tip {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--text-main);
+            max-width: 480px;
+            line-height: 1.5;
+        }
+
+        .countdown-tip span {
+            color: var(--danger);
+            font-weight: 700;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Export / Video Download Modal */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background-color: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            width: 90%;
+            max-width: 650px;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .modal-content video {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            border-radius: 6px;
+            background-color: #000;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+    </style>
 </head>
-
 <body>
-<header>
- <strong>HTML Video Studio</strong>
- <span class="muted">HTML → preview → canvas recording (no screen-share dialog)</span>
-</header>
 
-<main id="layout">
+    <!-- Header Controls -->
+    <header>
+        <div class="brand">
+            <span class="brand-dot"></span>
+            HTML Video Studio
+        </div>
 
-<section class="pane" id="left">
- <div class="bar">
-  <strong>1. AI video prompt / HTML input</strong>
-  <span class="muted">Copy prompt, then paste generated HTML here</span>
- </div>
+        <div class="controls">
+            <!-- Recording Indicator & Timer -->
+            <div class="recording-timer" id="recordingTimer">
+                <span class="pulse-indicator"></span>
+                <span id="timeDisplay">00:00</span>
+            </div>
 
-<textarea id="code" spellcheck="false">You are an expert educational video scriptwriter, motion-graphics designer, and front-end HTML/CSS/JavaScript animation developer.
+            <!-- Audio Options -->
+            <label class="audio-toggle">
+                <input type="checkbox" id="micToggle"> Include Mic Audio
+            </label>
 
-TASK
-Create a polished, professional, faceless animated video as ONE complete HTML file that can be pasted into my HTML Video Studio and recorded as a video.
+            <!-- Actions -->
+            <button class="btn-outline" id="runBtn">▶ Run Preview</button>
+            <button class="btn-danger" id="recordBtn">● Start Recording</button>
+        </div>
+    </header>
 
-FIRST: UNDERSTAND MY MATERIAL
-I may provide any combination of:
-- A topic, rough idea, question, outline, lesson, narration, or written notes
-- PDF documents, Word documents, PowerPoint slides, spreadsheets, text files
-- Images, screenshots, diagrams, charts, scanned pages, or photographs
-- Existing scripts, reference links, or other attachments
+    <!-- Workspace -->
+    <div class="workspace">
+        <!-- HTML Code Editor -->
+        <section class="editor-container">
+            <div class="section-header">
+                <span>Code Editor (HTML, CSS, JS)</span>
+                <span>Auto-Stop Hook Ready</span>
+            </div>
+            <textarea id="codeEditor" spellcheck="false"></textarea>
+        </section>
 
-Carefully inspect every supplied attachment that you can access. Extract relevant facts, text, numbers, examples, labels, diagrams, and sequence from the material. Use the supplied material as the primary source. Do not invent facts or silently change its meaning. If a file or image is unreadable or unavailable, tell me exactly what you could not inspect. If essential information is missing, ask concise clarification questions before creating the video. If the request is already clear, proceed without unnecessary questions.
+        <!-- Preview Stage -->
+        <section class="preview-container">
+            <div class="stage-wrapper" id="stageWrapper">
+                <!-- 5s Hold Overlay -->
+                <div class="countdown-overlay" id="countdownOverlay">
+                    <div class="countdown-number" id="countdownNumber">5</div>
+                    <div class="countdown-tip">
+                        Click <span>"Hide"</span> on the bottom screen-share toolbar now!<br>
+                        Recording starts immediately after.
+                    </div>
+                </div>
+                <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin allow-modals"></iframe>
+            </div>
+        </section>
+    </div>
 
-MY VIDEO REQUEST
-[Describe the topic, audience, purpose, language, desired style, and specific requirements.]
+    <!-- Export / Video Download Modal -->
+    <div class="modal" id="exportModal">
+        <div class="modal-content">
+            <h3>Recording Complete</h3>
+            <video id="recordedVideo" controls autoplay playsinline></video>
+            <div class="modal-actions">
+                <button class="btn-outline" id="closeModalBtn">Dismiss</button>
+                <button class="btn-primary" id="downloadWebmBtn">Download WebM</button>
+                <button class="btn-primary" id="downloadMp4Btn" style="display:none;">Download MP4</button>
+            </div>
+        </div>
+    </div>
 
-Video duration in seconds: window.VIDEO_DURATION_SECONDS = 120;
-Language:
-Add suitable diagrams, explanations, 2D animations, 3D-style animations, and original cartoon assets.
-Use attractive backgrounds, teacher/cartoon characters or stickman animations where appropriate.
-Use professional educational-video visuals and transitions.
+    <script>
+        // DOM Selectors
+        const codeEditor = document.getElementById('codeEditor');
+        const previewFrame = document.getElementById('previewFrame');
+        const stageWrapper = document.getElementById('stageWrapper');
+        const countdownOverlay = document.getElementById('countdownOverlay');
+        const countdownNumber = document.getElementById('countdownNumber');
+        const runBtn = document.getElementById('runBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const micToggle = document.getElementById('micToggle');
+        const recordingTimer = document.getElementById('recordingTimer');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const exportModal = document.getElementById('exportModal');
+        const recordedVideo = document.getElementById('recordedVideo');
+        const downloadWebmBtn = document.getElementById('downloadWebmBtn');
+        const downloadMp4Btn = document.getElementById('downloadMp4Btn');
+        const closeModalBtn = document.getElementById('closeModalBtn');
 
-VIDEO DESIGN REQUIREMENTS
-- Detect the most suitable teaching/storytelling approach.
-- Create a clear beginning, logical middle, and strong ending.
-- Use professional visual design, readable typography, consistent colors, smooth transitions, and purposeful motion.
-- Use animated diagrams, labels, charts, equations, timelines, icons, shapes, character illustrations, or other visuals when they improve understanding.
-- Avoid a static slide-deck appearance.
-- Include narration or on-screen explanatory text as appropriate.
-- Keep all important text inside safe margins and readable at 16:9.
-- Use suitable free assets only when they genuinely improve the video.
-- Do not use copyrighted characters, logos, music, or footage without permission.
+        // State variables
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let timerInterval = null;
+        let recordingSeconds = 0;
+        let isRecording = false;
+        let mixedStream = null;
 
-DURATION AND TIMING
-- Include window.VIDEO_DURATION_SECONDS with the actual planned duration in seconds.
-- Make the animation timeline begin at 0 and progress in sync with the declared duration.
-- At the end of the timeline, send:
-  parent.postMessage({studio:'video-complete'}, '*');
-- Do not send the completion message before the final scene has finished.
-
-TECHNICAL HTML REQUIREMENTS
-- Return ONE complete, ready-to-run HTML document.
-- Use HTML, CSS, SVG, and vanilla JavaScript.
-- Do not require React, npm, a build step, or installation.
-- Make it work at 1920×1080, 16:9.
-- Start from the opening scene whenever the HTML page is freshly loaded.
-- Use requestAnimationFrame or a reliable time-based animation loop.
-- Avoid zero-sized canvas elements, overlapping animation loops, unhandled errors, and cross-origin canvas dependencies.
-- Keep external dependencies to a minimum.
-- Do not include editor/studio interface elements in the video itself.
-
-OUTPUT FORMAT
-1. Briefly summarize your interpretation and material used.
-2. State planned duration and scene structure.
-3. Provide the complete HTML code in ONE code block.
-4. Include the duration declaration and video-complete message.
-5. Identify any attachment you could not inspect.
-
-Now review my request and all attached materials, then create the video HTML.
-Share code in plain text in chat.</textarea>
-
- <div class="tools">
-  <button class="primary" id="copyPrompt">Copy AI prompt</button>
-  <button id="run">Run / Update preview</button>
-  <button id="sample">Load Sample</button>
-  <button id="clear">Clear</button>
- </div>
-
- <div class="foot">
-  Workflow: copy the prompt and send it to an AI with your topic and attachments.
-  Replace this prompt with the complete HTML returned by the AI, then click Run / Update preview.
-  Use trusted HTML only.
- </div>
-</section>
-
-<div class="divider" id="divider"></div>
-
-<section class="pane" id="right">
- <div class="bar rightbar">
-  <strong>2. Video preview</strong>
-  <span class="muted">Rendered in the browser</span>
- </div>
-
- <div class="preview" id="previewWrap">
-  <!-- allow-same-origin REMOVED to avoid sandbox escape warning -->
-  <iframe id="frame" sandbox="allow-scripts" title="HTML preview"></iframe>
- </div>
-
- <div class="tools righttools">
-  <label class="muted">
-   FPS
-   <select id="fps">
-    <option>24</option>
-    <option selected>30</option>
-    <option>60</option>
-   </select>
-  </label>
-
-  <label class="muted">
-   Duration (seconds)
-   <input class="duration" id="duration" type="number"
-          min="1" max="3600" value="60">
-  </label>
-
-  <label class="muted">
-   Download format
-   <select id="format">
-    <option value="mp4" selected>MP4 (H.264)</option>
-    <option value="webm">WebM</option>
-   </select>
-  </label>
-
-  <button class="primary" id="record">● Record full preview</button>
-  <button id="download" disabled>Download Video</button>
- </div>
-
- <div id="status">
-  Replace the prompt with your video HTML, update preview, then record.
- </div>
-
- <div class="foot">
-  Recording uses the preview iframe, not screen sharing.
-  MP4 conversion requires internet access and browser support for FFmpeg.wasm.
- </div>
-</section>
-</main>
-
-<script>
-(()=>{
-"use strict";
-
-const $=id=>document.getElementById(id);
-const code=$("code");
-const frame=$("frame");
-const status=$("status");
-
-let blob=null;
-let recorderBusy=false;
-let ffmpeg=null;
-let ffmpegLoading=false;
-let ffmpegPromise=null;
-let downloadBusy=false;
-
-function say(message,error=false){
- status.textContent=message;
- status.style.color=error?"#ffaaaa":"#b9d4ff";
-}
-
-/* --------------------------------------------------
-   BUILD PREVIEW HTML AND INSERT RECORDING BRIDGE
--------------------------------------------------- */
-
-function buildSrcdoc(source){
-
- const bridge=`
-<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>
-
-<script>
-(()=>{
-"use strict";
-
-let rec=null;
-let parts=[];
-let canvas=null;
-let ctx=null;
-let loop=null;
-let stopTimer=null;
-let active=false;
-let drawing=false;
-let stream=null;
-
-const send=(type,extra={})=>{
- parent.postMessage({studio:type,...extra},"*");
-};
-
-async function start(fps){
-
- try{
-
-  if(!window.html2canvas){
-   throw Error("html2canvas could not load. Check internet connection.");
+        // Default Animation Template with TTS Voice-over & Auto-Stop Signal
+        const defaultTemplate = `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at center, #1e1b4b, #0f172a);
+    color: white;
+    font-family: sans-serif;
+    overflow: hidden;
   }
-
-  if(typeof MediaRecorder==="undefined"){
-   throw Error("MediaRecorder is not supported in this browser.");
+  .card {
+    text-align: center;
+    transform: scale(0.6);
+    opacity: 0;
+    animation: entrance 3.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   }
-
-  if(active)return;
-
-  active=true;
-  canvas=document.createElement("canvas");
-  canvas.width=1920;
-  canvas.height=1080;
-
-  ctx=canvas.getContext("2d");
-
-  if(!ctx)throw Error("Could not create recording canvas.");
-
-  stream=canvas.captureStream(fps);
-
-  const mime="video/webm;codecs=vp9";
-  const selectedMime=MediaRecorder.isTypeSupported(mime)
-      ?mime:"video/webm";
-
-  rec=new MediaRecorder(stream,{
-   mimeType:selectedMime,
-   videoBitsPerSecond:16000000
-  });
-
-  parts=[];
-
-  rec.ondataavailable=e=>{
-   if(e.data&&e.data.size)parts.push(e.data);
-  };
-
-  rec.onerror=e=>{
-   send("error",{message:e.error?.message||"MediaRecorder error"});
-  };
-
-  rec.onstop=()=>{
-   active=false;
-   clearInterval(loop);
-   clearTimeout(stopTimer);
-
-   if(stream){
-    stream.getTracks().forEach(track=>track.stop());
-   }
-
-   const result=new Blob(parts,{
-    type:rec.mimeType||"video/webm"
-   });
-
-   result.arrayBuffer().then(buffer=>{
-    send("complete",{
-     buffer,
-     mime:result.type
-    });
-   });
-  };
-
-  await draw();
-
-  if(!active)return;
-
-  rec.start(1000);
-
-  loop=setInterval(()=>{
-   if(active&&!drawing)draw();
-  },Math.max(50,1000/fps));
-
-  const declared=Number(
-   window.VIDEO_DURATION_SECONDS||
-   document.documentElement.dataset.videoDuration||
-   document.body.dataset.videoDuration||0
-  );
-
-  if(declared>0){
-   stopTimer=setTimeout(finish,declared*1000);
-   send("started",{duration:declared});
-  }else{
-   send("started",{duration:0});
+  .orb {
+    width: 90px;
+    height: 90px;
+    background: linear-gradient(45deg, #ec4899, #8b5cf6);
+    border-radius: 50%;
+    margin: 0 auto 20px auto;
+    filter: blur(1px);
+    box-shadow: 0 0 35px #8b5cf6;
+    animation: float 2s ease-in-out infinite alternate;
   }
+  h1 { font-size: 2.5rem; margin: 0; font-weight: 800; }
+  p { color: #94a3b8; font-size: 1.2rem; margin-top: 10px; }
+  .caption {
+    margin-top: 30px;
+    font-size: 1rem;
+    color: #38bdf8;
+    background: rgba(0,0,0,0.4);
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  @keyframes entrance {
+    0% { transform: scale(0.6); opacity: 0; }
+    50% { transform: scale(1.05); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes float {
+    from { transform: translateY(0px); }
+    to { transform: translateY(-15px); }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="orb"></div>
+    <h1>Motion Studio AI</h1>
+    <p>Automated Recording & Voiceover</p>
+    <div class="caption" id="captionBox">Initializing audio...</div>
+  </div>
 
- }catch(error){
-  active=false;
-  send("error",{message:error.message||String(error)});
- }
-}
-
-function finish(){
- if(!active)return;
-
- active=false;
- clearInterval(loop);
- clearTimeout(stopTimer);
-
- if(rec&&rec.state!=="inactive"){
-  rec.stop();
- }
-}
-
-addEventListener("message",event=>{
-
- if(!event.data)return;
-
- if(event.data.studio==="start"){
-  start(Number(event.data.fps)||30);
- }
-
- if(event.data.studio==="finish"){
-  finish();
- }
-
- if(event.data.studio==="video-complete"){
-  finish();
- }
-});
-
-async function draw(){
-
- if(!active||drawing)return;
-
- drawing=true;
-
- try{
-
-  const shot=await html2canvas(
-   document.documentElement,
-   {
-    backgroundColor:null,
-    scale:1,
-    width:1920,
-    height:1080,
-    windowWidth:1920,
-    windowHeight:1080,
-    logging:false,
-
-    // Exclude iframe elements before html2canvas clones the document.
-    // This prevents attempts to read cross-origin contentWindow.document.
-    ignoreElements:element=>element.tagName==="IFRAME",
-
-    // Second safeguard: remove any iframe that remains in the clone.
-    onclone:doc=>{
-     doc.querySelectorAll("iframe").forEach(el=>el.remove());
-
-     // Remove canvases that have zero dimensions.
-     doc.querySelectorAll("canvas").forEach(c=>{
-      const r=c.getBoundingClientRect();
-      if(!c.width||!c.height||!r.width||!r.height){
-       c.remove();
+  <script>
+    // Audio synthesis / Voiceover
+    function speakText(text, callback) {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.onend = callback;
+        window.speechSynthesis.speak(utterance);
+      } else {
+        setTimeout(callback, 3000);
       }
-     });
     }
-   }
-  );
-
-  if(active&&shot.width>0&&shot.height>0){
-
-   ctx.clearRect(0,0,1920,1080);
-   ctx.fillStyle="#000";
-   ctx.fillRect(0,0,1920,1080);
-
-   const k=Math.min(
-    1920/shot.width,
-    1080/shot.height
-   );
-
-   const dw=shot.width*k;
-   const dh=shot.height*k;
-
-   ctx.drawImage(
-    shot,
-    (1920-dw)/2,
-    (1080-dh)/2,
-    dw,
-    dh
-   );
-  }
 
- }catch(error){
-
-  if(active){
-   send("error",{
-    message:"Frame capture failed: "+error.message
-   });
-  }
-
- }finally{
-  drawing=false;
- }
-}
-
-})();
-<\/script>`;
-
- let clean=source;
-
- if(/<\/body\s*>/i.test(clean)){
-  return clean.replace(/<\/body\s*>/i,bridge+"</body>");
- }
-
- return clean+bridge;
-}
-
-/* --------------------------------------------------
-   PREVIEW BUTTONS
--------------------------------------------------- */
-
-function update(){
- frame.srcdoc=buildSrcdoc(code.value);
- say("Preview updated.");
-}
-
-$("copyPrompt").onclick=async()=>{
- try{
-  await navigator.clipboard.writeText(code.value);
-  say("AI prompt copied.");
- }catch(error){
-  code.focus();
-  code.select();
-  say("Clipboard blocked. Press Ctrl+C to copy.",true);
- }
-};
-
-$("run").onclick=update;
-
-$("sample").onclick=()=>{
- code.value=
- '<!doctype html><html><head><style>'+
- 'body{margin:0;height:100vh;display:grid;place-items:center;'+
- 'background:linear-gradient(120deg,#172554,#7e22ce);'+
- 'color:white;font:bold 5vw Arial}'+
- 'h1{animation:pulse 2s infinite}'+
- '@keyframes pulse{50%{transform:scale(1.12);color:#fde68a}}'+
- '</style></head><body><h1>My animated scene</h1></body></html>';
-
- update();
-};
-
-$("clear").onclick=()=>{
- code.value="";
- update();
-};
-
-/* --------------------------------------------------
-   RECORDING RESET
--------------------------------------------------- */
-
-function reset(){
-
- recorderBusy=false;
-
- document.body.classList.remove("recording");
-
- document.body.style.removeProperty("--record-scale");
-
- frame.style.width="";
- frame.style.height="";
- frame.style.transform="";
-
- $("record").disabled=false;
- $("record").textContent="● Record full preview";
- $("download").disabled=!blob;
-}
-
-/* --------------------------------------------------
-   START RECORDING FROM THE BEGINNING
--------------------------------------------------- */
-
-$("record").onclick=()=>{
-
- if(recorderBusy)return;
-
- const fps=Number($("fps").value)||30;
-
- blob=null;
- $("download").disabled=true;
-
- recorderBusy=true;
- $("record").disabled=true;
- $("record").textContent="Recording…";
-
- say("Restarting video from the beginning…");
-
- const scale=Math.min(
-  window.innerWidth/1920,
-  window.innerHeight/1080
- );
-
- document.body.style.setProperty(
-  "--record-scale",
-  String(scale)
- );
-
- document.body.classList.add("recording");
-
- frame.onload=()=>{
-  frame.onload=null;
-
-  setTimeout(()=>{
-   if(frame.contentWindow){
-    frame.contentWindow.postMessage({
-     studio:"start",
-     fps
-    },"*");
-   }
-  },1000);
- };
-
- frame.srcdoc=buildSrcdoc(code.value);
-};
-
-/* --------------------------------------------------
-   RECEIVE MESSAGES ONLY FROM OUR PREVIEW IFRAME
--------------------------------------------------- */
-
-window.addEventListener("message",event=>{
-
- if(event.source!==frame.contentWindow)return;
-
- const d=event.data||{};
-
- if(d.studio==="started"){
-
-  if(d.duration>0){
-   say("Recording from beginning. Duration: "+d.duration+" seconds.");
-  }else{
-   say("Recording started. Waiting for video-complete signal.");
-  }
- }
-
- if(d.studio==="error"){
-  say(d.message||"Recording failed.",true);
-  reset();
- }
-
- if(d.studio==="complete"){
-
-  blob=new Blob(
-   [d.buffer],
-   {type:d.mime||"video/webm"}
-  );
-
-  reset();
-
-  say(
-   "Recording complete. Select MP4 or WebM and click Download Video."
-  );
- }
-});
-
-/* --------------------------------------------------
-   LOAD FFMPEG
--------------------------------------------------- */
-
-async function loadFFmpeg(){
-
- if(ffmpeg)return ffmpeg;
-
- if(ffmpegPromise)return ffmpegPromise;
-
- ffmpegPromise=(async()=>{
-
-  if(!window.FFmpeg){
-   throw new Error(
-    "FFmpeg library did not load. Check your internet connection and reload the Studio."
-   );
-  }
-
-  const {createFFmpeg}=window.FFmpeg;
-
-  if(typeof createFFmpeg!=="function"){
-   throw new Error(
-    "FFmpeg library version is not compatible."
-   );
-  }
-
-  say("Loading MP4 conversion engine. First load may take some time...");
-
-  ffmpeg=createFFmpeg({
-   log:false,
-   corePath:
-    "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js"
-  });
-
-  await ffmpeg.load();
-
-  return ffmpeg;
-
- })();
-
- try{
-  return await ffmpegPromise;
- }catch(error){
-  ffmpeg=null;
-  throw error;
- }finally{
-  ffmpegPromise=null;
- }
-}
-
-/* --------------------------------------------------
-   CONVERT WEBM TO MP4
--------------------------------------------------- */
-
-async function convertToMP4(webmBlob){
-
- const engine=await loadFFmpeg();
- const {fetchFile}=window.FFmpeg;
-
- say("Preparing video for MP4 conversion...");
-
- try{
-  engine.FS("unlink","input.webm");
- }catch(e){}
-
- try{
-  engine.FS("unlink","output.mp4");
- }catch(e){}
-
- engine.FS(
-  "writeFile",
-  "input.webm",
-  await fetchFile(webmBlob)
- );
-
- say("Converting to MP4 (H.264). Keep this tab open...");
-
- await engine.run(
-  "-i","input.webm",
-  "-c:v","libx264",
-  "-preset","ultrafast",
-  "-crf","23",
-  "-pix_fmt","yuv420p",
-  "-movflags","+faststart",
-  "-an",
-  "output.mp4"
- );
-
- const output=engine.FS("readFile","output.mp4");
-
- if(!output||!output.length){
-  throw new Error("MP4 conversion produced an empty file.");
- }
-
- const mp4Blob=new Blob(
-  [output],
-  {type:"video/mp4"}
- );
-
- try{
-  engine.FS("unlink","input.webm");
-  engine.FS("unlink","output.mp4");
- }catch(e){}
-
- return mp4Blob;
-}
-
-/* --------------------------------------------------
-   DOWNLOAD VIDEO
--------------------------------------------------- */
-
-$("download").onclick=async()=>{
-
- if(!blob||downloadBusy)return;
-
- downloadBusy=true;
- $("download").disabled=true;
-
- try{
-
-  const format=$("format").value;
-
-  let finalBlob;
-  let filename;
-
-  if(format==="mp4"){
-
-   finalBlob=await convertToMP4(blob);
-   filename="MPSC-Educational-Video.mp4";
-
-  }else{
-
-   finalBlob=blob;
-   filename="MPSC-Educational-Video.webm";
-
-  }
-
-  const url=URL.createObjectURL(finalBlob);
-
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=filename;
-
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  setTimeout(()=>{
-   URL.revokeObjectURL(url);
-  },120000);
-
-  say("Download started: "+filename);
-
- }catch(error){
-
-  console.error("Video export error:",error);
-
-  say(
-   "MP4 export failed: "+(error.message||String(error))+
-   ". Try WebM, or open Studio through localhost.",
-   true
-  );
-
- }finally{
-
-  downloadBusy=false;
-  $("download").disabled=!blob;
-
- }
-};
-
-/* --------------------------------------------------
-   RESIZABLE PANES
--------------------------------------------------- */
-
-const divider=$("divider");
-const layout=$("layout");
-
-let drag=false;
-
-divider.onpointerdown=e=>{
- drag=true;
- divider.setPointerCapture(e.pointerId);
-};
-
-divider.onpointermove=e=>{
-
- if(!drag||window.innerWidth<=800)return;
-
- const r=layout.getBoundingClientRect();
-
- const p=Math.max(
-  25,
-  Math.min(75,(e.clientX-r.left)/r.width*100)
- );
-
- layout.style.gridTemplateColumns=
-  `minmax(260px,${p}fr) 8px minmax(280px,${100-p}fr)`;
-};
-
-divider.onpointerup=divider.onpointercancel=()=>{
- drag=false;
-};
-
-/* --------------------------------------------------
-   INITIAL PREVIEW
--------------------------------------------------- */
-
-update();
-
-})();
-</script>
+    const narration = "Welcome to HTML Video Studio. High quality capture with automatic export.";
+    document.getElementById('captionBox').innerText = narration;
+
+    // Start narration and complete video automatically
+    setTimeout(() => {
+      speakText(narration, () => {
+        setTimeout(() => {
+          // Tell the parent studio that the animation is finished
+          window.parent.postMessage({ type: 'ANIMATION_COMPLETE' }, '*');
+        }, 1000);
+      });
+    }, 500);
+  <\/script>
+</body>
+</html>`;
+
+        // Initialize Editor
+        codeEditor.value = defaultTemplate;
+
+        function updatePreview() {
+            previewFrame.srcdoc = codeEditor.value;
+        }
+
+        runBtn.addEventListener('click', updatePreview);
+        window.addEventListener('load', updatePreview);
+
+        // Recording Button Handler
+        recordBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                initiateRecordingSequence();
+            }
+        });
+
+        // Step 1: Prompt Share -> Make Fullscreen -> 5s Hold Countdown -> Start
+        async function initiateRecordingSequence() {
+            try {
+                // Request Screen + Audio sharing
+                const displayStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { displaySurface: "browser", frameRate: 60 },
+                    audio: true
+                });
+
+                // Request optional microphone
+                const audioTracks = [];
+                if (micToggle.checked) {
+                    try {
+                        const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        audioTracks.push(...micStream.getAudioTracks());
+                    } catch (err) {
+                        console.warn("Microphone access unavailable or denied:", err);
+                    }
+                }
+
+                // Audio mixing
+                const displayAudioTracks = displayStream.getAudioTracks();
+                let finalAudioTracks = [];
+
+                if (displayAudioTracks.length > 0 && audioTracks.length > 0) {
+                    const audioCtx = new AudioContext();
+                    const dest = audioCtx.createMediaStreamDestination();
+                    const src1 = audioCtx.createMediaStreamSource(new MediaStream([displayAudioTracks[0]]));
+                    const src2 = audioCtx.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+                    src1.connect(dest);
+                    src2.connect(dest);
+                    finalAudioTracks = dest.stream.getAudioTracks();
+                } else {
+                    finalAudioTracks = displayAudioTracks.length > 0 ? displayAudioTracks : audioTracks;
+                }
+
+                mixedStream = new MediaStream([
+                    ...displayStream.getVideoTracks(),
+                    ...finalAudioTracks
+                ]);
+
+                // Determine video container codec
+                let mimeType = 'video/webm;codecs=vp9,opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'video/webm';
+                if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1,mp4a.40.2')) {
+                    downloadMp4Btn.style.display = 'inline-flex';
+                }
+
+                recordedChunks = [];
+                mediaRecorder = new MediaRecorder(mixedStream, { mimeType });
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) recordedChunks.push(e.data);
+                };
+                mediaRecorder.onstop = handleRecordingComplete;
+
+                // Stop recording if the browser share bar is closed manually
+                displayStream.getVideoTracks()[0].onended = () => {
+                    if (isRecording) stopRecording();
+                };
+
+                // Request Fullscreen immediately after user confirms share
+                if (stageWrapper.requestFullscreen) {
+                    await stageWrapper.requestFullscreen().catch((err) => console.warn(err));
+                }
+
+                // Run 5-second hold countdown overlay
+                countdownOverlay.style.display = 'flex';
+                let holdSeconds = 5;
+                countdownNumber.innerText = holdSeconds;
+
+                const holdInterval = setInterval(() => {
+                    holdSeconds--;
+                    if (holdSeconds > 0) {
+                        countdownNumber.innerText = holdSeconds;
+                        // Trigger re-render of pop-in animation
+                        countdownNumber.style.animation = 'none';
+                        void countdownNumber.offsetWidth;
+                        countdownNumber.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                    } else {
+                        clearInterval(holdInterval);
+                        countdownOverlay.style.display = 'none';
+                        startActualRecording();
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error("Recording authorization was canceled or failed:", err);
+            }
+        }
+
+        // Step 2: Start capturing & reload animation from fresh zero state
+        function startActualRecording() {
+            // Fresh reload of preview animation at zero seconds
+            updatePreview();
+
+            mediaRecorder.start(200);
+            isRecording = true;
+
+            // UI updates
+            recordBtn.textContent = '■ Stop Recording';
+            recordBtn.classList.replace('btn-danger', 'btn-outline');
+            recordingTimer.style.display = 'inline-flex';
+            startTimer();
+        }
+
+        // Stop Recording
+        function stopRecording() {
+            if (!isRecording && !mediaRecorder) return;
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (mixedStream) {
+                mixedStream.getTracks().forEach(track => track.stop());
+            }
+
+            // Exit Fullscreen if active
+            if (document.fullscreenElement) {
+                document.exitFullscreen().catch(err => console.warn(err));
+            }
+
+            isRecording = false;
+            recordBtn.textContent = '● Start Recording';
+            recordBtn.classList.replace('btn-outline', 'btn-danger');
+            recordingTimer.style.display = 'none';
+            stopTimer();
+        }
+
+        // Automatic Stop Listener via postMessage
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'ANIMATION_COMPLETE') {
+                if (isRecording) {
+                    console.log('Animation completed. Auto-stopping recording...');
+                    stopRecording();
+                }
+            }
+        });
+
+        // Timer handlers
+        function startTimer() {
+            recordingSeconds = 0;
+            timeDisplay.textContent = '00:00';
+            timerInterval = setInterval(() => {
+                recordingSeconds++;
+                const mins = String(Math.floor(recordingSeconds / 60)).padStart(2, '0');
+                const secs = String(recordingSeconds % 60).padStart(2, '0');
+                timeDisplay.textContent = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+        }
+
+        // Video Export & Download Dialog
+        function handleRecordingComplete() {
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+            const videoUrl = URL.createObjectURL(blob);
+            recordedVideo.src = videoUrl;
+            exportModal.style.display = 'flex';
+
+            downloadWebmBtn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = videoUrl;
+                a.download = `studio-video-${Date.now()}.webm`;
+                a.click();
+            };
+
+            downloadMp4Btn.onclick = () => {
+                const a = document.createElement('a');
+                a.href = videoUrl;
+                a.download = `studio-video-${Date.now()}.mp4`;
+                a.click();
+            };
+        }
+
+        closeModalBtn.addEventListener('click', () => {
+            exportModal.style.display = 'none';
+            recordedVideo.pause();
+        });
+    </script>
 </body>
 </html>
+
+<!--
+Act as a Creative Motion Graphics Director and Senior Front-End Video Engineer. 
+
+Create a complete, single-file HTML/CSS/JS animation code designed to be rendered and recorded inside an automated HTML Video Studio.
+
+Here are the specifications for the video:
+
+1. VIDEO DETAILS & SCRIPT:
+- Topic / Concept: [e.g., Launching a new AI productivity app / Explaining Black Holes / A funny coffee shop comedy]
+- Target Duration: [e.g., 15 seconds / 30 seconds / 60 seconds]
+- Scene Breakdown & Script:
+  * Scene 1 (0s - 5s): [Describe visuals, character action, and spoken narration]
+  * Scene 2 (5s - 15s): [Describe visuals, character action, and spoken narration]
+  * Scene 3 (15s - 30s): [Describe call to action / ending]
+
+2. LANGUAGE & VOICE-OVER (TTS):
+- Spoken Language: [e.g., English (en-US), Spanish (es-ES), Hindi (hi-IN), French (fr-FR)]
+- Voice Gender: [Male / Female]
+- Audio Implementation: Use the browser's native window.speechSynthesis API to speak the narration script automatically. Timed dynamically to match the visual scene transitions. Add real-time subtitles/captions at the bottom of the screen.
+
+3. VISUAL STYLE & CHARACTERS:
+- Visual Style: [Choose one: 2D Flat Motion Design / Isometric Vector / Cyberpunk Neon / 3D Three.js WebGL / Storybook Cartoon]
+- Characters: [Choose: Animated SVG Vector Human / 2D Cartoon Character with expressive eye-blinks and mouth movement / 3D low-poly model loaded via CDN / Pure kinetic typography & geometric shapes]
+- Backgrounds & Effects: Dynamic CSS animations, particle effects, smooth camera transitions, or layered parallax.
+
+4. CRITICAL TECHNICAL REQUIREMENTS:
+- Self-Contained: Output everything in one single HTML file (HTML + embedded <style> + embedded <script>).
+- External Libraries: If 3D or advanced vector rigging is needed, load them only from public CDNs (e.g., Three.js, GSAP, or Lottie-web). Do not use local files or broken image links.
+- 16:9 Responsive Ratio: The composition must fill 100vw and 100vh, perfectly framed for a 1920x1080 video frame.
+- Sound & Tone: Include subtle procedural audio (using Web Audio API oscillators/chimes) for transitions or background atmosphere so the audio recorder captures rich audio.
+- MANDATORY AUTO-STOP SIGNAL: When the animation and voice-over finish at the exact target duration, trigger this exact JavaScript line so the recording studio automatically stops recording:
+  window.parent.postMessage({ type: 'ANIMATION_COMPLETE' }, '*');
+
+Now, generate the complete, production-ready HTML code without markdown placeholders or cutoffs.
+ -->
